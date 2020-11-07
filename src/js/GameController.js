@@ -132,6 +132,25 @@ export default class GameController {
     }
   }
 
+  // Повышаем уровень
+  levelUp() {
+    for (const item of this.userPositions) {
+      item.character.level += 1;
+      item.character.attack = this.characteristicsLevelUp(item.character.attack, item.character.health);
+      item.character.defence = this.characteristicsLevelUp(item.character.defence, item.character.health);
+      if ((item.character.health + 80) < 100) {
+        item.character.health += 80;
+      } else {
+        item.character.health = 100;
+      }
+    }
+  }
+
+  // Повышаем характеристики
+  characteristicsLevelUp(attackBefore, life) {
+    return Math.floor(Math.max(attackBefore, attackBefore * (1.8 - life / 100)));
+  }
+
   async onCellClick(index) {
     // TODO: react to click
 
@@ -324,22 +343,5 @@ export default class GameController {
       }
     }
     this.gamePlay.redrawPositions([...this.userPositions, ...this.enemyPositions]);
-  }
-
-  levelUp() {
-    for (const item of this.userPositions) {
-      item.character.level += 1;
-      item.character.attack = this.characteristicsLevelUp(item.character.attack, item.character.health);
-      item.character.defence = this.characteristicsLevelUp(item.character.defence, item.character.health);
-      if ((item.character.health + 80) < 100) {
-        item.character.health += 80;
-      } else {
-        item.character.health = 100;
-      }
-    }
-  }
-
-  characteristicsLevelUp(attackBefore, life) {
-    return Math.floor(Math.max(attackBefore, attackBefore * (1.8 - life / 100)));
   }
 }
