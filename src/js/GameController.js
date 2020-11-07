@@ -45,42 +45,91 @@ export default class GameController {
   }
 
   drawTeams() {
-    // Выбираем тему. Пока в ручном режиме
-    this.gamePlay.drawUi(themes.prairie);
-
-    // Создаем массивы игроков, столбцы для расположения и вызываем teamPosition для определения позиций в столбцах
+    // Определяем игрока и задаем персонажей
+    this.player = 'user';
     const userChars = [Bowman, Swordsman, Magician];
     const enemyChars = [Daemon, Undead, Vampire];
-    const positionsUserOne = [];
-    const positionsUserTwo = [];
-    const positionsEnemyOne = [];
-    const positionsEnemyTwo = [];
+    let userTeam;
+    let enemyTeam;
 
+    // Генерируем команды и отрисовываем персонажей для каждого уровня
+    if (this.level === 1) {
+      this.currentTheme = themes.prairie;
+      userTeam = generateTeam(userChars, 1, 2);
+      enemyTeam = generateTeam(enemyChars, 1, 2);
+      this.pushingCharacters(userTeam, enemyTeam, this.level);
+    } else if (this.level === 2) {
+      this.currentTheme = themes.desert;
+      userTeam = generateTeam(userChars, 1, 1);
+      enemyTeam = generateTeam(enemyChars, 2, userTeam.length + this.userPositions.length);
+      this.pushingCharacters(userTeam, enemyTeam, this.level);
+    } else if (this.level === 3) {
+      this.currentTheme = themes.arctic;
+      userTeam = generateTeam(userChars, 2, 2);
+      enemyTeam = generateTeam(enemyChars, 3, userTeam.length + this.userPositions.length);
+      this.pushingCharacters(userTeam, enemyTeam, this.level);
+    } else if (this.level === 4) {
+      this.currentTheme = themes.mountain;
+      userTeam = generateTeam(userChars, 3, 2);
+      enemyTeam = generateTeam(enemyChars, 4, userTeam.length + this.userPositions.length);
+      this.pushingCharacters(userTeam, enemyTeam, this.level);
+    } else {
+      this.blockedBoard = true;
+      GamePlay.showMessage(`Ваши очки: ${this.point}`);
+    }
+
+    this.gamePlay.drawUi(this.currentTheme);
+    this.gamePlay.redrawPositions([...this.userPositions, ...this.enemyPositions]);
+  }
+
+  pushingCharacters(userTeam, enemyTeam, level) {
+    // Задаем допустимые значения в столбцах
+    const columnUserOne = [];
+    const columnUserTwo = [];
+    const columnEnemyOne = [];
+    const columnEnemyTwo = [];
     function teamPosition(teamName, index) {
       for (let i = 0; i < index; i += 1) {
         if ((teamName === 'user') && (i % 8 === 0)) {
-          positionsUserOne.push(i);
-          positionsUserTwo.push(i + 1);
+          columnUserOne.push(i);
+          columnUserTwo.push(i + 1);
         } else if ((teamName === 'enemy') && (i % 8 === 0)) {
-          positionsEnemyOne.push(i + 6);
-          positionsEnemyTwo.push(i + 7);
+          columnEnemyOne.push(i + 6);
+          columnEnemyTwo.push(i + 7);
         }
       }
     }
-
     teamPosition('user', 63);
     teamPosition('enemy', 63);
 
-    // Генерируем команды и отрисовываем персонажей
-    const userTeam = generateTeam(userChars, 1, 2);
-    const enemyTeam = generateTeam(enemyChars, 1, 2);
-    const userPlayerOne = positionsUserOne[Math.floor(Math.random() * 8)];
-    const userPlayerTwo = positionsUserTwo[Math.floor(Math.random() * 8)];
-    const enemyPlayerOne = positionsEnemyOne[Math.floor(Math.random() * 8)];
-    const enemyPlayerTwo = positionsEnemyTwo[Math.floor(Math.random() * 8)];
-    this.userPositions = [new PositionedCharacter(userTeam[0], userPlayerOne), new PositionedCharacter(userTeam[1], userPlayerTwo)];
-    this.enemyPositions = [new PositionedCharacter(enemyTeam[Math.floor(Math.random() * 2)], enemyPlayerOne), new PositionedCharacter(enemyTeam[Math.floor(Math.random() * 2)], enemyPlayerTwo)];
-    this.gamePlay.redrawPositions([...this.userPositions, ...this.enemyPositions]);
+    // Выбираем случайные значения из массива столбца
+    const userPlayerOne = columnUserOne[Math.floor(Math.random() * 8)];
+    const userPlayerTwo = columnUserTwo[Math.floor(Math.random() * 8)];
+    const enemyPlayerOne = columnEnemyOne[Math.floor(Math.random() * 8)];
+    const enemyPlayerTwo = columnEnemyTwo[Math.floor(Math.random() * 8)];
+
+    // Добавляем игроков в зависимости от уровня
+    // !!!Возникла проблема с попаданием на одинаковые клетки + пока не реализовал рандом для персонажей
+    if (level === 1) {
+      this.userPositions.push(new PositionedCharacter(userTeam[0], userPlayerOne));
+      this.userPositions.push(new PositionedCharacter(userTeam[1], userPlayerTwo));
+      this.enemyPositions.push(new PositionedCharacter(enemyTeam[0], enemyPlayerOne));
+      this.enemyPositions.push(new PositionedCharacter(enemyTeam[1], enemyPlayerTwo));
+    } else if (level === 2) {
+      this.userPositions.push(new PositionedCharacter(userTeam[0], userPlayerOne));
+    } else if (level === 3) {
+      this.userPositions.push(new PositionedCharacter(userTeam[0], userPlayerOne));
+      this.userPositions.push(new PositionedCharacter(userTeam[1], userPlayerTwo));
+    } else if (level === 4) {
+      this.userPositions.push(new PositionedCharacter(userTeam[0], userPlayerOne));
+      this.userPositions.push(new PositionedCharacter(userTeam[1], userPlayerTwo));
+    }
+    // Добавляем противников в том же количестве, что и игроков
+    if (level !== 1) {
+      for (let i = 0; i < this.userPositions.length; i += 1) {
+        this.enemyPositions.push(new PositionedCharacter(enemyTeam[0], columnEnemyOne[Math.floor(Math.random() * 8)]));
+      }
+    }
   }
 
   async onCellClick(index) {
@@ -245,19 +294,11 @@ export default class GameController {
   }
 
   // Атакуем противника attacked персонажем attacker
-  // Возникла проблема с одинаковыми персонажами. При обращении через target здоровье снимается у всех одинаковых игроков
+  // !!!Возникла проблема с одинаковыми персонажами. При обращении через target здоровье снимается у всех одинаковых игроков
   async characterAttack(attacker, attacked) {
     const attackedCharacter = attacked.character;
     const damage = Math.floor(Math.max(attacker.attack - attackedCharacter.defence, attacker.attack * 0.1));
     await this.gamePlay.showDamage(attacked.position, damage);
-
-    // Тут пытался добраться до персонажа с конкретной позицией, но здоровье все равно снимается у всех персонажей
-    // for (let i = 0; i < [...this.enemyPositions].length; i += 1) {
-    //   if (Object.entries([...this.enemyPositions][i])[1].includes(attacked.position)) {
-    //     console.log([...this.enemyPositions]);
-    //     [...this.enemyPositions][i].character.health -= damage;
-    //   }
-    // }
 
     attackedCharacter.health -= damage;
     if (this.player === 'user') {
@@ -275,8 +316,30 @@ export default class GameController {
       if (this.userPositions.length === 0) {
         GamePlay.showMessage('Вы проиграли!');
       }
-      // ...здесь будет переход на следующий уровень, если погибли все персонажи противника
+      // Если погибли все персонажи противника, повышаем левел и переходим на новый
+      if (this.enemyPositions.length === 0) {
+        this.levelUp();
+        this.level += 1;
+        this.drawTeams();
+      }
     }
     this.gamePlay.redrawPositions([...this.userPositions, ...this.enemyPositions]);
+  }
+
+  levelUp() {
+    for (const item of this.userPositions) {
+      item.character.level += 1;
+      item.character.attack = this.characteristicsLevelUp(item.character.attack, item.character.health);
+      item.character.defence = this.characteristicsLevelUp(item.character.defence, item.character.health);
+      if ((item.character.health + 80) < 100) {
+        item.character.health += 80;
+      } else {
+        item.character.health = 100;
+      }
+    }
+  }
+
+  characteristicsLevelUp(attackBefore, life) {
+    return Math.floor(Math.max(attackBefore, attackBefore * (1.8 - life / 100)));
   }
 }
