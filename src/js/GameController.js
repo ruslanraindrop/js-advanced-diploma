@@ -1,16 +1,18 @@
+/* eslint-disable linebreak-style */
 /* eslint-disable class-methods-use-this */
 /* eslint-disable max-len */
 import themes from './themes';
-import Bowman from './characters/Bowman';
-import Swordsman from './characters/Swordsman';
-import Daemon from './characters/Daemon';
-import Magician from './characters/Magician';
-import Undead from './characters/Undead';
-import Vampire from './characters/Vampire';
+// import Bowman from './characters/Bowman';
+// import Swordsman from './characters/Swordsman';
+// import Daemon from './characters/Daemon';
+// import Magician from './characters/Magician';
+// import Undead from './characters/Undead';
+// import Vampire from './characters/Vampire';
 import PositionedCharacter from './PositionedCharacter';
 import { generateTeam } from './generators';
 import GamePlay from './GamePlay';
 import cursors from './cursors';
+import Team from './Team';
 
 export default class GameController {
   constructor(gamePlay, stateService) {
@@ -45,33 +47,32 @@ export default class GameController {
   }
 
   drawTeams() {
-    // Определяем игрока и задаем персонажей
+    // Определяем игрока
     this.player = 'user';
-    const userChars = [Bowman, Swordsman, Magician];
-    const enemyChars = [Daemon, Undead, Vampire];
-    let userTeam;
-    let enemyTeam;
 
     // Генерируем команды и отрисовываем персонажей для каждого уровня
+    let userTeam = [];
+    let enemyTeam = [];
+
     if (this.level === 1) {
       this.currentTheme = themes.prairie;
-      userTeam = generateTeam(userChars, 1, 2);
-      enemyTeam = generateTeam(enemyChars, 1, 2);
+      userTeam = generateTeam(Team.userChars, 1, 2);
+      enemyTeam = generateTeam(Team.enemyChars, 1, 2);
       this.pushingCharacters(userTeam, enemyTeam, this.level);
     } else if (this.level === 2) {
       this.currentTheme = themes.desert;
-      userTeam = generateTeam(userChars, 1, 1);
-      enemyTeam = generateTeam(enemyChars, 2, userTeam.length + this.userPositions.length);
+      userTeam = generateTeam(Team.userChars, 1, 1);
+      enemyTeam = generateTeam(Team.enemyChars, 2, userTeam.length + this.userPositions.length);
       this.pushingCharacters(userTeam, enemyTeam, this.level);
     } else if (this.level === 3) {
       this.currentTheme = themes.arctic;
-      userTeam = generateTeam(userChars, 2, 2);
-      enemyTeam = generateTeam(enemyChars, 3, userTeam.length + this.userPositions.length);
+      userTeam = generateTeam(Team.userChars, 2, 2);
+      enemyTeam = generateTeam(Team.enemyChars, 3, userTeam.length + this.userPositions.length);
       this.pushingCharacters(userTeam, enemyTeam, this.level);
     } else if (this.level === 4) {
       this.currentTheme = themes.mountain;
-      userTeam = generateTeam(userChars, 3, 2);
-      enemyTeam = generateTeam(enemyChars, 4, userTeam.length + this.userPositions.length);
+      userTeam = generateTeam(Team.userChars, 3, 2);
+      enemyTeam = generateTeam(Team.enemyChars, 4, userTeam.length + this.userPositions.length);
       this.pushingCharacters(userTeam, enemyTeam, this.level);
     } else {
       this.blockedBoard = true;
@@ -313,13 +314,20 @@ export default class GameController {
   }
 
   // Атакуем противника attacked персонажем attacker
-  // !!!Возникла проблема с одинаковыми персонажами. При обращении через target здоровье снимается у всех одинаковых игроков
+  // !!!Возникла проблема с одинаковыми персонажами. Здоровье снимается у всех одинаковых игроков
   async characterAttack(attacker, attacked) {
     const attackedCharacter = attacked.character;
     const damage = Math.floor(Math.max(attacker.attack - attackedCharacter.defence, attacker.attack * 0.1));
     await this.gamePlay.showDamage(attacked.position, damage);
 
+    // for (let i = 0; i < [...this.enemyPositions].length; i += 1) {
+    //   if (attacked.position === [...this.enemyPositions][i].position) {
+    //     [...this.enemyPositions][i].character.health -= damage;
+    //   }
+    // }
+
     attackedCharacter.health -= damage;
+    console.log([...this.enemyPositions]);
     if (this.player === 'user') {
       this.player = 'enemy';
     } else if (this.player === 'enemy') {
