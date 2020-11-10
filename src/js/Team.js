@@ -7,12 +7,14 @@ import Undead from './characters/Undead';
 import Vampire from './characters/Vampire';
 
 const userTeam = [Bowman, Swordsman, Magician];
+const userTeamShort = [Bowman, Swordsman];
 const enemyTeam = [Daemon, Undead, Vampire];
 
 class Team {
   constructor() {
-    this.userChars = userTeam;
-    this.enemyChars = enemyTeam;
+    this.userTeam = userTeam;
+    this.userTeamShort = userTeamShort;
+    this.enemyTeam = enemyTeam;
   }
 }
 
