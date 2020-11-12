@@ -1,4 +1,3 @@
-/* eslint-disable linebreak-style */
 import Bowman from './characters/Bowman';
 import Swordsman from './characters/Swordsman';
 import Daemon from './characters/Daemon';

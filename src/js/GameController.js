@@ -1,4 +1,3 @@
-/* eslint-disable linebreak-style */
 /* eslint-disable class-methods-use-this */
 /* eslint-disable max-len */
 import themes from './themes';
@@ -7,6 +6,9 @@ import { generateTeam } from './generators';
 import GamePlay from './GamePlay';
 import cursors from './cursors';
 import Team from './Team';
+import GameState from './GameState';
+import showInformation from './showInformation';
+import { allowedValuesMove, allowedValuesAttack } from './allowedCells';
 
 export default class GameController {
   constructor(gamePlay, stateService) {
@@ -24,12 +26,6 @@ export default class GameController {
     this.selectedIndex = 0;
     this.selectedCharacter = {};
     this.point = 0;
-    this.icons = {
-      level: '\u{1F396}',
-      attack: '\u{2694}',
-      defence: '\u{1F6E1}',
-      health: '\u{2764}',
-    };
   }
 
   init() {
@@ -43,6 +39,9 @@ export default class GameController {
     this.gamePlay.addCellEnterListener(this.onCellEnter.bind(this));
     this.gamePlay.addCellLeaveListener(this.onCellLeave.bind(this));
     this.gamePlay.addCellClickListener(this.onCellClick.bind(this));
+    this.gamePlay.addNewGameListener(this.newGame.bind(this));
+    this.gamePlay.addSaveGameListener(this.saveGame.bind(this));
+    this.gamePlay.addLoadGameListener(this.loadGame.bind(this));
   }
 
   drawTeams() {
@@ -71,19 +70,18 @@ export default class GameController {
       this.userTeams = generateTeam(Team.userTeam, 3, 2);
       this.enemyTeams = generateTeam(Team.enemyTeam, 4, this.userTeams.length + this.userPositions.length);
       this.addPositionCharacter(this.userTeams, this.enemyTeams);
+      GamePlay.showMessage('Четвертый уровень');
     } else {
       this.blockedBoard = true;
-      GamePlay.showMessage(`Игра окончена. Ваши очки: ${this.point}`);
+      GamePlay.showMessage(`Игра окончена. Ваши очки: ${this.point}. Прошлый рекорд: ${this.maxPoints()}`);
       return;
     }
 
     const characterPositions = this.getPositions(this.userPositions.length);
-
     for (let i = 0; i < this.userPositions.length; i += 1) {
       this.userPositions[i].position = characterPositions.user[i];
       this.enemyPositions[i].position = characterPositions.enemy[i];
     }
-
     this.gamePlay.drawUi(this.currentTheme);
     this.gamePlay.redrawPositions([...this.userPositions, ...this.enemyPositions]);
   }
@@ -163,9 +161,9 @@ export default class GameController {
       this.gamePlay.deselectCell(index);
       this.selected = false;
       this.gamePlay.redrawPositions([...this.userPositions, ...this.enemyPositions]);
-      // Здесь будет переход хода
+      // Переход хода
       this.player = 'enemy';
-
+      this.enemyStrategy();
       // Если выделен персонаж и курсор в состоянии атаки, то атакуем
     } else if (this.selected && this.gamePlay.boardEl.style.cursor === 'crosshair') {
       const attackEnemy = [...this.enemyPositions].find((item) => item.position === index);
@@ -173,8 +171,10 @@ export default class GameController {
       this.gamePlay.deselectCell(index);
       this.gamePlay.setCursor(cursors.auto);
       this.selected = false;
-
       await this.characterAttack(this.selectedCharacter.character, attackEnemy);
+      if (this.enemyPositions.length > 0) {
+        this.enemyStrategy();
+      }
     }
   }
 
@@ -184,7 +184,7 @@ export default class GameController {
     this.index = index;
     for (const item of [...this.userPositions, ...this.enemyPositions]) {
       if (item.position === index) {
-        this.gamePlay.showCellTooltip(this.showInformation(item.character), index);
+        this.gamePlay.showCellTooltip(showInformation(item.character), index);
       }
     }
     // Если игрок выделен, то меняем курсор в зависимости от допустимых действий
@@ -200,11 +200,6 @@ export default class GameController {
     this.gamePlay.setCursor(cursors.auto);
   }
 
-  // Формируем информацию о персонаже для отображения статуса
-  showInformation(character) {
-    return `${this.icons.level}${character.level} ${this.icons.attack}${character.attack} ${this.icons.defence}${character.defence} ${this.icons.health}${character.health}`;
-  }
-
   // Определяем индекс
   funcFindIndex(positions) {
     return positions.findIndex((item) => item.position === this.index);
@@ -213,8 +208,8 @@ export default class GameController {
   definingCursor() {
     // Если игрок выделен, то определяем допустимые значения для передвижения...
     if (this.selected) {
-      const allowedMove = this.allowedValuesMove(this.selectedCharacter.position, this.selectedCharacter.character.distanceTravel, this.gamePlay.boardSize);
-      const allowedAttack = this.allowedValuesAttack(this.selectedCharacter.position, this.selectedCharacter.character.distanceAttack, this.gamePlay.boardSize);
+      const allowedMove = allowedValuesMove(this.selectedCharacter.position, this.selectedCharacter.character.distanceTravel, this.gamePlay.boardSize);
+      const allowedAttack = allowedValuesAttack(this.selectedCharacter.position, this.selectedCharacter.character.distanceAttack, this.gamePlay.boardSize);
 
       // ...и меняем курсор
       if (this.funcFindIndex(this.userPositions) !== -1) {
@@ -231,74 +226,9 @@ export default class GameController {
     }
   }
 
-  // Определяем допустимые значения для движения
-  allowedValuesMove(position, distance, boardSize) {
-    const result = [];
-    const itemRow = Math.floor(position / boardSize);
-    const itemColumn = position % boardSize;
-
-    for (let i = 1; i <= distance; i += 1) {
-      if (itemColumn + i < 8) {
-        result.push(itemRow * 8 + (itemColumn + i));
-      }
-      if (itemColumn - i >= 0) {
-        result.push(itemRow * 8 + (itemColumn - i));
-      }
-      if (itemRow + i < 8) {
-        result.push((itemRow + i) * 8 + itemColumn);
-      }
-      if (itemRow - i >= 0) {
-        result.push((itemRow - i) * 8 + itemColumn);
-      }
-      if (itemRow + i < 8 && itemColumn + i < 8) {
-        result.push((itemRow + i) * 8 + (itemColumn + i));
-      }
-      if (itemRow - i >= 0 && itemColumn - i >= 0) {
-        result.push((itemRow - i) * 8 + (itemColumn - i));
-      }
-      if (itemRow + i < 8 && itemColumn - i >= 0) {
-        result.push((itemRow + i) * 8 + (itemColumn - i));
-      }
-      if (itemRow - i >= 0 && itemColumn + i < 8) {
-        result.push((itemRow - i) * 8 + (itemColumn + i));
-      }
-    }
-    return result;
-  }
-
-  // Определяем допустимые значения для атаки
-  allowedValuesAttack(position, distance, boardSize) {
-    const result = [];
-    const itemRow = Math.floor(position / boardSize);
-    const itemColumn = position % boardSize;
-
-    for (let i = 1; i <= distance; i += 1) {
-      if (itemColumn + i < 8) {
-        result.push(itemRow * 8 + (itemColumn + i));
-      }
-      if (itemColumn - i >= 0) {
-        result.push(itemRow * 8 + (itemColumn - i));
-      }
-      if (itemRow + i < 8) {
-        result.push((itemRow + i) * 8 + itemColumn);
-      }
-      if (itemRow - i >= 0) {
-        result.push((itemRow - i) * 8 + itemColumn);
-      }
-      if (itemRow + i < 8 && itemColumn + i < 8) {
-        result.push((itemRow + i) * 8 + (itemColumn + i));
-      }
-      if (itemRow - i >= 0 && itemColumn - i >= 0) {
-        result.push((itemRow - i) * 8 + (itemColumn - i));
-      }
-      if (itemRow + i < 8 && itemColumn - i >= 0) {
-        result.push((itemRow + i) * 8 + (itemColumn - i));
-      }
-      if (itemRow - i >= 0 && itemColumn + i < 8) {
-        result.push((itemRow - i) * 8 + (itemColumn + i));
-      }
-    }
-    return result;
+  async enemyAttacks(character, target) {
+    await this.characterAttack(character, target);
+    this.player = 'user';
   }
 
   // Атакуем противника attacked персонажем attacker
@@ -333,5 +263,199 @@ export default class GameController {
       }
     }
     this.gamePlay.redrawPositions([...this.userPositions, ...this.enemyPositions]);
+  }
+
+  enemyStrategy() {
+    if (this.player === 'enemy') {
+      // Атакуем игроков user в рамках допустимых значений
+      for (const itemEnemy of [...this.enemyPositions]) {
+        const allowAttack = allowedValuesAttack(itemEnemy.position, this.selectedCharacter.character.distanceAttack, this.gamePlay.boardSize);
+        const target = this.enemyAttack(allowAttack);
+        if (target !== null) {
+          this.enemyAttacks(itemEnemy.character, target);
+          return;
+        }
+      }
+
+      // Двигаемся случайным игроком
+      const randomIndex = Math.floor(Math.random() * [...this.enemyPositions].length);
+      const randomEnemy = [...this.enemyPositions][randomIndex];
+      this.enemyMove(randomEnemy);
+      this.gamePlay.redrawPositions([...this.userPositions, ...this.enemyPositions]);
+      this.player = 'user';
+    }
+  }
+
+  enemyMove(itemEnemy) {
+    const tempEnemy = itemEnemy;
+    const itemEnemyDistance = itemEnemy.character.distanceTravel;
+    let tempRow;
+    let tempColumn;
+    let stepRow;
+    let stepColumn;
+    let Steps;
+    const itemEnemyRow = this.positionRow(tempEnemy.position);
+    const itemEnemyColumn = this.positionColumn(tempEnemy.position);
+    let nearUser = {};
+
+    for (const itemUser of [...this.userPositions]) {
+      const itemUserRow = this.positionRow(itemUser.position);
+      const itemUserColumn = this.positionColumn(itemUser.position);
+      stepRow = itemEnemyRow - itemUserRow;
+      stepColumn = itemEnemyColumn - itemUserColumn;
+      Steps = Math.abs(stepRow) + Math.abs(stepColumn);
+
+      if (nearUser.steps === undefined || Steps < nearUser.steps) {
+        nearUser = {
+          steprow: stepRow,
+          stepcolumn: stepColumn,
+          steps: Steps,
+          positionRow: itemUserRow,
+          positionColumn: itemUserColumn,
+        };
+      }
+    }
+
+    // Движение по диагонали
+    if (Math.abs(nearUser.steprow) === Math.abs(nearUser.stepcolumn)) {
+      if (Math.abs(nearUser.steprow) > itemEnemyDistance) {
+        tempRow = (itemEnemyRow - (itemEnemyDistance * Math.sign(nearUser.steprow)));
+        tempColumn = (itemEnemyColumn - (itemEnemyDistance * Math.sign(nearUser.stepcolumn)));
+
+        tempEnemy.position = this.rowColumnToIndex(tempRow, tempColumn);
+      } else {
+        tempRow = (itemEnemyRow - (nearUser.steprow - (1 * Math.sign(nearUser.steprow))));
+        tempColumn = (itemEnemyColumn - (nearUser.stepcolumn - (1 * Math.sign(nearUser.steprow))));
+
+        tempEnemy.position = this.rowColumnToIndex(tempRow, tempColumn);
+      }
+    } else if (nearUser.stepcolumn === 0) {
+      // Движение по вертикали
+      if (Math.abs(nearUser.steprow) > itemEnemyDistance) {
+        tempRow = (itemEnemyRow - (itemEnemyDistance * Math.sign(nearUser.steprow)));
+
+        tempEnemy.position = this.rowColumnToIndex(tempRow, (itemEnemyColumn));
+      } else {
+        tempRow = (itemEnemyRow - (nearUser.steprow - (1 * Math.sign(nearUser.steprow))));
+
+        tempEnemy.position = this.rowColumnToIndex(tempRow, (itemEnemyColumn));
+      }
+    } else if (nearUser.steprow === 0) {
+      // horizontal travel
+      if (Math.abs(nearUser.stepcolumn) > itemEnemyDistance) {
+        tempColumn = (itemEnemyColumn - (itemEnemyDistance * Math.sign(nearUser.stepcolumn)));
+
+        tempEnemy.position = this.rowColumnToIndex((itemEnemyRow), tempColumn);
+      } else {
+        const tempFormul = (nearUser.stepcolumn - (1 * Math.sign(nearUser.stepcolumn)));
+        tempColumn = (itemEnemyColumn - tempFormul);
+
+        tempEnemy.position = this.rowColumnToIndex((itemEnemyRow), tempColumn);
+      }
+    } else if (Math.abs(nearUser.steprow) > Math.abs(nearUser.stepcolumn)) {
+      if (Math.abs(nearUser.steprow) > itemEnemyDistance) {
+        tempRow = (itemEnemyRow - (itemEnemyDistance * Math.sign(nearUser.steprow)));
+
+        tempEnemy.position = this.rowColumnToIndex(tempRow, (itemEnemyColumn));
+      } else {
+        tempRow = (itemEnemyRow - (nearUser.steprow));
+
+        tempEnemy.position = this.rowColumnToIndex(tempRow, (itemEnemyColumn));
+      }
+    } else if (Math.abs(nearUser.stepcolumn) > itemEnemyDistance) {
+      tempColumn = (itemEnemyColumn - (itemEnemyDistance * Math.sign(nearUser.stepcolumn)));
+
+      tempEnemy.position = this.rowColumnToIndex((itemEnemyRow), tempColumn);
+    } else {
+      tempEnemy.position = this.rowColumnToIndex((itemEnemyRow), (itemEnemyColumn));
+    }
+  }
+
+  positionRow(index) {
+    return Math.floor(index / this.gamePlay.boardSize);
+  }
+
+  positionColumn(index) {
+    return index % this.gamePlay.boardSize;
+  }
+
+  rowColumnToIndex(row, column) {
+    return (row * 8) + column;
+  }
+
+  enemyAttack(allowAttack) {
+    for (const itemUser of [...this.userPositions]) {
+      if (allowAttack.includes(itemUser.position)) {
+        return itemUser;
+      }
+    }
+    return null;
+  }
+
+  // Новая игра
+  newGame() {
+    this.blockedBoard = false;
+    const maxPoint = this.maxPoints();
+    const currentGameState = this.stateService.load();
+    if (currentGameState) {
+      currentGameState.maxPoint = maxPoint;
+      this.stateService.save(GameState.from(currentGameState));
+    }
+    this.userPositions = [];
+    this.enemyPositions = [];
+    this.level = 1;
+    this.point = 0;
+    this.currentTheme = themes.prairie;
+    this.drawTeams();
+    GamePlay.showMessage('Новая игра');
+  }
+
+  // Сохранить игру
+  saveGame() {
+    const maxPoint = this.maxPoints();
+    const currentGameState = {
+      point: this.point,
+      maxPoint,
+      level: this.level,
+      currentTheme: this.currentTheme,
+      userPositions: this.userPositions,
+      enemyPositions: this.enemyPositions,
+    };
+    this.stateService.save(GameState.from(currentGameState));
+    GamePlay.showMessage('Игра сохранена!');
+  }
+
+  // Загрузить игру
+  loadGame() {
+    try {
+      const loadGameState = this.stateService.load();
+      if (loadGameState) {
+        this.point = loadGameState.point;
+        this.level = loadGameState.level;
+        this.currentTheme = loadGameState.currentTheme;
+        this.userPositions = loadGameState.userPositions;
+        this.enemyPositions = loadGameState.enemyPositions;
+        this.gamePlay.drawUi(this.currentTheme);
+        this.gamePlay.redrawPositions([...this.userPositions, ...this.enemyPositions]);
+      }
+      GamePlay.showMessage('Игра загружена');
+    } catch (e) {
+      GamePlay.showMessage(`Ошибка: ${e}`);
+      this.newGame();
+    }
+  }
+
+  // Статистика
+  maxPoints() {
+    let maxPoint = 0;
+    try {
+      const loadGameState = this.stateService.load();
+      if (loadGameState) {
+        maxPoint = Math.max(loadGameState.maxPoint, this.point);
+      }
+    } catch (e) {
+      maxPoint = this.point;
+    }
+    return maxPoint;
   }
 }
